@@ -1,6 +1,3 @@
-def c_to_f(c):
-    return round((c * 1.8) + 32, 1)
-
 def process_payload(msg_id, f):
     data = {}
 
@@ -110,8 +107,8 @@ def process_payload(msg_id, f):
         # Byte 15:
         data["Inverter_DC_Bus_Voltage_V"] = f[15]
         
-        # Byte 16: Unknowed
-        data["0001_50_b16"] = f[16] # I no longer think this is amp average but it is a caculated number
+        # Byte 16:
+        data["IPM_Load_Index"] = f[16] # I no longer think this is amp average but it is a caculated number
         
 #        data["0001_50"] = "0001_50"
 
@@ -158,21 +155,21 @@ def process_payload(msg_id, f):
         
         # Byte 6:
         
-        # Byte 7: UNKNOWED assuming temp
-        data["0001_52_b7"] = f[7]
+        # Byte 7:
+        data["IPM_Heatsink_Temp_1"] = f[7]
         
-        # Byte 8: UNKNOWED assuming temp
-        data["0001_52_b8"] = f[8]
+        # Byte 8:
+        data["IPM_Heatsink_Temp_2"] = f[8]
         
         # Byte 9: Signed integer (Two's Complement)
         raw_delta = f[9]
         data["PID_Step_Delta"] = raw_delta if raw_delta <= 127 else raw_delta - 256 #
         
         # Byte 10:
-        data["PID_P_Error"] = f[10]
+        data["IPM_Phase_Current_A"] = f[10] # This is not PID_P_Error
         
         # Byte 11:
-        data["PID_I_Error"] = f[11]
+        data["IPM_Phase_Current_B"] = f[11] # This is not PID_I_Error
         
         # Byte 12:
         
@@ -192,8 +189,9 @@ def process_payload(msg_id, f):
 
         # Byte 5:
         
-        # Byte 6:
-        data["VAC"] = f[6]
+        # Byte 6: Routine Phase Modifier (Signed 8-bit)
+        raw_phase_mod = f[6]
+        data["Phase_Modifier"] = raw_phase_mod if raw_phase_mod <= 127 else raw_phase_mod - 256
         
         # Byte 7: 0-4 = Idle, 5-9 = Active Ramp
         data["Routine_Phase_Step"] = f[7]
