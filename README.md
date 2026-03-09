@@ -92,48 +92,89 @@ data/
 
 ---
 
-## Identified Telemetry Fields
+## Sensor Reference
 
-**Indoor Unit (IDU) — frame `0100_20`**
+All byte indices are **payload-relative** (byte 5 of the raw frame = index 5, matching the DB column names HPA5, ODU5, etc).
 
-| Field | Description |
-|---|---|
-| `IDU_Mode` | Operating mode (Off / Cool / Heat / Fan / Dry) |
-| `IDU_Demand_Hz` | Requested compressor frequency |
-| `Target_Setpoint` | Thermostat setpoint (°C) |
-| `IDU_Blower_Speed` | Fan speed (Low / Medium / High / Boost / Auto) |
-| `T1_Room_Temp` | Room air temperature (°C) |
-| `T2_IDU_Coil_Temp` | Indoor coil temperature (°C) |
+### Confidence Levels
+- ✅ **Confirmed** — Validated against physical measurements or unambiguous observed behaviour
+- ⚠️ **Probable** — Formula fits data well, physically plausible, not yet ground-truthed
+- ❓ **Unknown** — Captured but meaning not yet decoded
 
-**Outdoor Unit (ODU) — frames `0001_20`, `0001_50`–`0001_53`**
+---
 
-| Field | Description |
-|---|---|
-| `ODU_Mode` | Operating mode (Off / Cool / Heat / Fan / Dry / Defrost) |
-| `Compressor_Actual_Hz` | Live compressor frequency (Hz) |
-| `ODU_Target_Hz` | PID target compressor frequency (Hz) |
-| `T3_ODU_Coil_Temp` | Outdoor coil temperature (°C) |
-| `T4_Outdoor_Temp` | Outdoor ambient temperature (°C) |
-| `TP_Discharge_Temp` | Discharge line temperature (°C) |
-| `Compressor_Actual_Amps` | Compressor current draw (A) |
-| `ODU_Fan_Speed_Target_RPM` | Fan speed target (RPM) |
-| `ODU_Fan_Speed_Actual_RPM` | Fan speed actual (RPM) |
-| `ODU_Fan_Speed_Step` | Fan gear index |
-| `ODU_DC_Bus_Voltage_Target` | DC bus voltage target (V) |
-| `ODU_DC_Bus_Voltage_Actual` | DC bus voltage actual (V) |
-| `Inverter_DC_Bus_Voltage_V` | Inverter DC bus voltage (V) |
-| `AC_Input_Voltage_V` | AC input voltage (V) |
-| `EXV_Position_Steps` | Expansion valve position (steps) |
-| `PID_Step_Delta` | PID output step delta (signed) |
-| `PID_P_Error` | PID proportional error term |
-| `PID_I_Error` | PID integral error term |
-| `Routine_Phase_Step` | Startup/idle routine phase (0–4 idle, 5–9 active ramp) |
-| `Active_Ramp_Routine` | Active ramp flag (oil return / high load) |
-| `Run_Minutes_Clock` | Runtime minutes counter |
-| `Run_Hours_Clock` | Runtime hours counter |
-| `VAC` | Byte 6 of frame 53 (under investigation) |
+### Frame `0100_20` — IDU Core (Indoor Unit → ODU)
 
-*Sensor values were derived through traffic observation and reverse-engineered scaling — not from official documentation. Interpretations may and will evolve as more frames are analyzed.*
+| Byte | Sensor Name | Formula | Unit | Confidence | Notes |
+|------|-------------|---------|------|------------|-------|
+| 6 | `IDU_Mode` | enum map | — | ✅ | 0x00=Off, 0x01=Cool, 0x02=Heat, 0x03=Fan, 0x04=Dry |
+| 7 | `IDU_Demand_Hz` | `raw` | Hz | ✅ | IDU's requested compressor frequency. Proportional to (T1_room − setpoint) delta. Confirmed range 0–96 Hz |
+| 11 | `Target_Setpoint` | `raw` | °C | ✅ | User setpoint in °C, no offset or scaling needed |
+| 12 | `IDU_Blower_Speed` | enum map | — | ✅ | 0x01=High, 0x02=Medium, 0x03=Low, 0x06=Boost, 0x0F=Auto |
+| 13 | `T1_Room_Temp` | `(raw − 61) / 2` | °C | ⚠️ | Indoor ambient temperature, unverified against a reference thermometer |
+| 14 | `T2_IDU_Coil_Temp` | `(raw − 61) / 2` | °C | ⚠️ | Indoor evaporator/condenser coil temperature, unverified against a reference thermometer |
+
+---
+
+### Frame `0001_20` — ODU Core (ODU → IDU)
+
+| Byte | Sensor Name | Formula | Unit | Confidence | Notes |
+|------|-------------|---------|------|------------|-------|
+| 6 | `Compressor_Actual_Hz` | `raw` | Hz | ✅ | Real-time running frequency. Smooth ramp, confirmed 0–80 Hz observed |
+| 9 | `T3_ODU_Coil_Temp` | `(raw − 61) / 2` | °C | ✅ | Outdoor coil temperature. Goes strongly negative when iced (defrost trigger visible in data), unverified against a reference thermometer |
+| 10 | `T4_Outdoor_Temp` | `(raw × 0.33) − 13.26` | °C | ⚠️ | Outdoor ambient. Formula origin unknown — results are physically plausible but unverified against a reference thermometer and need to include the quater degree b[15] |
+| 11 | `TP_Discharge_Temp` | `raw / 2` | °C | ⚠️ | Compressor discharge line temperature |
+| 12 | `Compressor_Actual_Amps` | `raw / ?` | A | ⚠️ | Divisor unconfirmed. Raw peaks at ~30 at 80 Hz defrost. Needs clamp meter validation at high load |
+| 13 | `ODU_Unknown_B13` | `raw` | — | ❓ | Narrow range (177–185), stable. Possibly resistance |
+| 14 | `ODU_Mode` | enum map | — | ✅ | 0x00=Off, 0x01=Cool, 0x02=Heat, 0x03=Fan, 0x04=Dry, 0x07=Defrost |
+
+---
+
+### Frame `0001_50` — ODU Performance A (HPA)
+
+| Byte | Sensor Name | Formula | Unit | Confidence | Notes |
+|------|-------------|---------|------|------------|-------|
+| 11 | `ODU_Fan_Speed_Actual_RPM` | `raw × 8` | RPM | ✅ | Outdoor fan actual speed. Zero during defrost (fan off confirmed) |
+| 12 | `ODU_DC_Bus_Voltage_Actual` | `raw` | V | ✅ | Rectified DC bus, actual measured value |
+| 14 | `AC_Input_Voltage` | `raw` | V | ✅ | Mains input voltage. Observed 179–207 V, consistent with US 240 V supply variation |
+| 15 | `Inverter_DC_Bus_Voltage` | `raw` | V | ✅ | Inverter-side DC rail, ~134–170 V (rectified from 120 V leg) |
+| 16 | `IPM_Load_Index` | `raw` | — | ⚠️ | Tracks compressor Hz nearly 1:1. Not average amps despite original label. Likely a normalised load or duty index reported by the IPM module |
+
+---
+
+### Frame `0001_51` — ODU Performance B (HPB)
+
+| Byte | Sensor Name | Formula | Unit | Confidence | Notes |
+|------|-------------|---------|------|------------|-------|
+| 5 | `ODU_Fan_Speed_Target_RPM` | `raw × 8` | RPM | ✅ | Outdoor fan target speed |
+| 6 | `ODU_DC_Bus_Voltage_Target` | `raw` | V | ✅ | DC bus target setpoint |
+| 11 | `Run_Minutes_Clock` | `raw` | min | ⚠️ | Compressor run-time minutes component |
+| 12 | `Run_Hours_Clock` | `(raw × 256) / 60` | min | ⚠️ | Compressor run-time hours component. Combined with byte 11 for total runtime |
+
+---
+
+### Frame `0001_52` — ODU Performance C (HPC)
+
+| Byte | Sensor Name | Formula | Unit | Confidence | Notes |
+|------|-------------|---------|------|------------|-------|
+| 7 | `IPM_Heatsink_Temp_1` | `raw` | °C | ⚠️ | No offset/scaling — raw value appears to be °C directly. Varies with ambient (17–20 °C on mild days). Lower of the two heatsink probes |
+| 8 | `IPM_Heatsink_Temp_2` | `raw` | °C | ⚠️ | Same as above, consistently ~8 °C warmer than Temp_1. Likely a second probe on the same IPM heatsink |
+| 9 | `Compressor_PID_Step` | signed int8 | — | ⚠️ | Two's complement signed byte. `+7` = aggressive ramp-up (soft-start only). `0` = compressor off. `−1` = steady-state trim. `−2` = active decel / thermal protection (only seen at high load with rising discharge temp) |
+| 10 | `IPM_Phase_Current_A` | `raw` | A | ⚠️ | IPM module phase current feedback, primary measurement. Raw units — divisor unconfirmed pending clamp meter. Monotonically tracks load: ~4 at 15 Hz, ~9 at 48 Hz, ~13 at 80 Hz defrost |
+| 11 | `IPM_Phase_Current_B` | `raw` | A | ⚠️ | Secondary phase current, consistently ~0.7× of Phase A across all operating points. Likely a different shunt or phase winding measurement on the same IPM |
+| 13 | `ODU_Fan_Speed_Step` | `raw` | — | ✅ | Fan speed gear index (integer step, not RPM). Correlates with RPM bands |
+
+---
+
+### Frame `0001_53` — ODU Performance D (HPD)
+
+| Byte | Sensor Name | Formula | Unit | Confidence | Notes |
+|------|-------------|---------|------|------------|-------|
+| 6 | `Phase_Modifier` | `raw if raw <= 127 else raw - 256` | — | ⚠️ | Acts as a negative logic flag, an inverted bitmask, or a countdown timer modifier that tells the system what sub-state the current phase is in
+| 7 | `Routine_Phase_Step` | `raw` | — | ⚠️ | Compressor startup/ramp phase index. Values 0–4 observed at idle/shutdown, higher values during active ramp sequences |
+| 8 | `Active_Ramp_Routine` | `raw` | — | ⚠️ | Non-zero during oil return or high-load ramp events |
+| 11+12 | `EXV_Position_Steps` | `(byte12 × 256) + byte11` | steps | ✅ | Electronic expansion valve position. 16-bit little-endian. Range ~75 steps (idle) to ~4200 steps (full defrost). Responds correctly to load changes |
+| 13 | `ODU_Target_Hz` | `raw` | Hz | ✅ | ODU's internal PID frequency target. Leads `Compressor_Actual_Hz`. Jumps to 25 Hz at soft-start, then tracks IDU demand. Observed ceiling: 80 Hz during defrost, ~48–58 Hz during normal heating |
 
 ---
 
