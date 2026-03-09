@@ -83,7 +83,6 @@ class SenvilleMQTT:
         self.register_sensor("Compressor_Actual_Amps", unit="A")
         self.register_sensor("0001_20_b13", state_class="measurement")
         self.register_sensor("ODU_Mode")
-#        self.register_sensor("T4_Decimal_Fraction")
         # 0001_50
         self.register_sensor("ODU_Fan_Speed_Actual_RPM", unit="RPM")
         self.register_sensor("ODU_DC_Bus_Voltage_Actual", unit="V", device_class="voltage")
