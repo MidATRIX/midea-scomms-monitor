@@ -4,11 +4,15 @@ Reverse engineering and monitoring tools for the S-Comms (S1S2) communication bu
 
 This project focuses on passive monitoring and protocol documentation of the communication between the indoor air handler and outdoor inverter unit.
 
-The goal is to expose internal system telemetry such as compressor behavior, temperatures, voltages, and expansion valve position and make those metrics available for monitoring platforms like Home Assistant.
+The goal is to expose internal system telemetry such as compressor behavior, temperatures, voltages, and expansion valve position and make those metrics available for monitoring.
+
+
+## How to run
+PYTHONPATH=. python3  src/main.py 
 
 
 ## Project Goals
-* Document the S-Comms protocol structure.
+* Document the S-Comms (S1S2) protocol structure.
 * Capture and analyze RS485 traffic.
 * Validate CRC-16/MODBUS frame integrity.
 * Identify sensor fields and scaling.
