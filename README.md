@@ -6,6 +6,7 @@ This project focuses on passive monitoring and protocol documentation of the com
 
 The goal is to expose internal system telemetry such as compressor behavior, temperatures, voltages, and expansion valve position and make those metrics available for monitoring.
 
+[Home Assistant Discussion Thread](https://community.home-assistant.io/t/reverse-engineering-senville-midea-scomms/992233?u=midatrix)
 
 ## How to run
 PYTHONPATH=. python3  src/main.py 
