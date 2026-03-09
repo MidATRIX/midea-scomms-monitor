@@ -87,6 +87,8 @@ PYTHONPATH=. python3  src/main.py
 * **Stop Bits:** 1
 * **Protocol:** RS485
 
+![Home Assistant Dashboard](images/Waveshare_Setup.png)
+
 
 **Checksum algorithm:**
 * **Type:** CRC-16 / MODBUS
