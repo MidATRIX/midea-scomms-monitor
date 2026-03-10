@@ -121,7 +121,7 @@ All byte indices are **payload-relative** (byte 5 of the raw frame = index 5, ma
 | Byte | Sensor Name | Formula | Unit | Confidence | Notes |
 |------|-------------|---------|------|------------|-------|
 | 6 | `Compressor_Actual_Hz` | `raw` | Hz | ✅ | Real-time running frequency. Smooth ramp, confirmed 0–80 Hz observed |
-| 9 | `T3_ODU_Coil_Temp` | `(raw − 61) / 2` | °C | ✅ | Outdoor coil temperature. Goes strongly negative when iced (defrost trigger visible in data), unverified against a reference thermometer |
+| 9 | `T3_ODU_Coil_Temp` | `(raw − 61) / 2` | °C | ⚠️ | Outdoor coil temperature. Goes strongly negative when iced (defrost trigger visible in data), unverified against a reference thermometer |
 | 10 | `T4_Outdoor_Temp` | `(raw × 0.33) − 13.26` | °C | ⚠️ | Outdoor ambient. Formula origin unknown — results are physically plausible but unverified against a reference thermometer and need to include the quater degree b[15] |
 | 11 | `TP_Discharge_Temp` | `raw / 2` | °C | ⚠️ | Compressor discharge line temperature |
 | 12 | `Compressor_Actual_Amps` | `raw / ?` | A | ⚠️ | Divisor unconfirmed. Raw peaks at ~30 at 80 Hz defrost. Needs clamp meter validation at high load |
