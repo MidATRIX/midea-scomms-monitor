@@ -31,6 +31,19 @@ pip install -r requirements.txt
 
 ## Configuration
 
+```
+IDU ──────── S1/S2 ──────── ODU
+               │
+          Waveshare RS485-ETH
+               │
+          TCP :8888
+               │
+          This script
+               │
+          SQLite
+          MQTT → Home Assistant
+```
+
 Edit `src/config.py` before running:
 
 ```python
@@ -91,6 +104,63 @@ data/
 - Integrate telemetry into Home Assistant
 
 ---
+
+
+## Protocol Specification
+
+### Bus Parameters
+
+| Parameter | Value |
+|---|---|
+| Baud Rate | 4800 |
+| Data Bits | 8 |
+| Parity | None |
+| Stop Bits | 1 |
+| Interface | RS485 half-duplex |
+
+### Frame Structure (A0 frames)
+
+```
+[A0] [DD DD] [CC] [LL] [ ... PAYLOAD ... ] [CR CR] ([00])
+  0    1  2    3    4     5 .. 5+LL-1        -3  -2    -1
+```
+
+| Bytes | Field | Notes |
+|---|---|---|
+| 0 | Header | `0xA0` |
+| 1–2 | Device address | `0x0001` = ODU, `0x0100` = IDU |
+| 3 | Message ID | `0x20`, `0x50`–`0x53`, etc. |
+| 4 | Payload length | Number of data bytes that follow |
+| 5..N | Payload | Sensor data |
+| N+1–N+2 | CRC | CRC-16/MODBUS, little-endian |
+| N+3 | Padding | `0x00` — present only on `direction 01` frames |
+
+### Checksum
+
+| Parameter | Value |
+|---|---|
+| Algorithm | CRC-16/MODBUS |
+| Polynomial (reflected) | `0xA001` |
+| Initial value | `0xFFFF` |
+| Bit order | LSB-first (reflected) |
+| Output | 2 bytes, little-endian |
+
+### Message Cycle
+
+Captured traffic shows a repeating exchange between ODU and IDU:
+
+```
+20 → 21 → 20 → 50 → 20 → 51 → 20 → 52 → 20 → 53 → 20 → 91
+```
+
+Message `20` is a high-frequency core telemetry frame. The `50`–`53` series rotates through extended diagnostic data.
+
+### Example Captures
+
+```
+13:51:42.853  ODU (0001)  ID:20  A00001200C120F000077742604B5010001001D51
+13:51:42.946  IDU (0100)  ID:20  A00100200C11010F000000170F6C60190000E7B400
+```
 
 ## Sensor Reference
 
@@ -178,61 +248,6 @@ All byte indices are **payload-relative** (byte 5 of the raw frame = index 5, ma
 
 ---
 
-## Protocol Specification
-
-### Bus Parameters
-
-| Parameter | Value |
-|---|---|
-| Baud Rate | 4800 |
-| Data Bits | 8 |
-| Parity | None |
-| Stop Bits | 1 |
-| Interface | RS485 half-duplex |
-
-### Frame Structure (A0 frames)
-
-```
-[A0] [DD DD] [CC] [LL] [ ... PAYLOAD ... ] [CR CR] ([00])
-  0    1  2    3    4     5 .. 5+LL-1        -3  -2    -1
-```
-
-| Bytes | Field | Notes |
-|---|---|---|
-| 0 | Header | `0xA0` |
-| 1–2 | Device address | `0x0001` = ODU, `0x0100` = IDU |
-| 3 | Message ID | `0x20`, `0x50`–`0x53`, etc. |
-| 4 | Payload length | Number of data bytes that follow |
-| 5..N | Payload | Sensor data |
-| N+1–N+2 | CRC | CRC-16/MODBUS, little-endian |
-| N+3 | Padding | `0x00` — present only on `direction 01` frames |
-
-### Checksum
-
-| Parameter | Value |
-|---|---|
-| Algorithm | CRC-16/MODBUS |
-| Polynomial (reflected) | `0xA001` |
-| Initial value | `0xFFFF` |
-| Bit order | LSB-first (reflected) |
-| Output | 2 bytes, little-endian |
-
-### Message Cycle
-
-Captured traffic shows a repeating exchange between ODU and IDU:
-
-```
-20 → 21 → 20 → 50 → 20 → 51 → 20 → 52 → 20 → 53 → 20 → 91
-```
-
-Message `20` is a high-frequency core telemetry frame. The `50`–`53` series rotates through extended diagnostic data.
-
-### Example Captures
-
-```
-13:51:42.853  ODU (0001)  ID:20  A00001200C120F000077742604B5010001001D51
-13:51:42.946  IDU (0100)  ID:20  A00100200C11010F000000170F6C60190000E7B400
-```
 
 ---
 
